@@ -3,6 +3,7 @@
 #include "user/user.h"
 #include "kernel/fs.h"
 
+// get filename from path
 char*
 fmtname(char *path)
 {
