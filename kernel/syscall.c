@@ -105,6 +105,7 @@ extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -129,6 +130,7 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_trace]   sys_trace,
+[SYS_sysinfo]    sys_sysinfo,
 };
 
 #define MAP(f, n) f(n)
@@ -137,7 +139,7 @@ static uint64 (*syscalls[])(void) = {
     i(fork) i(exit) i(wait) i(pipe) i(read) i(kill) i(exec) \
     i(fstat) i(chdir) i(dup) i(getpid) i(sbrk) i(sleep)     \
     i(uptime) i(open) i(write) i(mknod) i(unlink) i(link)   \
-    i(mkdir) i(close) i(trace)                              
+    i(mkdir) i(close) i(trace) i(sysinfo)                           
 
 char *syscallstr[] = { MAP(SYSCALLS, str) };
 
