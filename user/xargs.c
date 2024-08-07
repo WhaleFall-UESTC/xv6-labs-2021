@@ -1,5 +1,4 @@
 #include <user/helper.h>
-#include <kernel/param.h>
 
 char* readline(int fd) {
     char *buf = (char *) malloc(BUFSIZ);

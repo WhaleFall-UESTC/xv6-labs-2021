@@ -44,12 +44,12 @@ extern struct cpu cpus[NCPU];
 struct trapframe {
   /*   0 */ uint64 kernel_satp;   // kernel page table
   /*   8 */ uint64 kernel_sp;     // top of process's kernel stack
-  /*  16 */ uint64 kernel_trap;   // usertrap()
-  /*  24 */ uint64 epc;           // saved user program counter
-  /*  32 */ uint64 kernel_hartid; // saved kernel tp
-  /*  40 */ uint64 ra;
-  /*  48 */ uint64 sp;
-  /*  56 */ uint64 gp;
+  /*  16 */ uint64 kernel_trap;   // usertrap() user_trap_handler
+  /*  24 */ uint64 epc;           // saved user program counter, 就是用户的 pc 寄存器的值，方便跳回去
+  /*  32 */ uint64 kernel_hartid; // saved kernel tp  保存的内核线程处理器ID
+  /*  40 */ uint64 ra;            // 返回地址寄存器
+  /*  48 */ uint64 sp;            // 栈指针寄存器
+  /*  56 */ uint64 gp;            
   /*  64 */ uint64 tp;
   /*  72 */ uint64 t0;
   /*  80 */ uint64 t1;
