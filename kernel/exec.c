@@ -8,6 +8,7 @@
 #include "elf.h"
 
 static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uint sz);
+void vmprint(pagetable_t pagetable);
 
 int
 exec(char *path, char **argv)
@@ -116,6 +117,9 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
+  if (p->pid == 1)
+    vmprint(p->pagetable);
+
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
@@ -151,4 +155,27 @@ loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz
   }
   
   return 0;
+}
+
+
+void 
+vmprint_helpler(pagetable_t pagetable, int layer) 
+{
+  if (layer == 0) return;
+  for (int i = 0; i < PTEs; i++) {
+    if (pagetable[i] != 0) {
+      for (int j = 0; j < NPGLAYER + 1 - layer; j++)
+        printf(" ..");
+      printf("%d: pte %p pa %p\n", 
+        i, pagetable[i], PTE2PA(pagetable[i]));
+      vmprint_helpler((pagetable_t)PTE2PA(pagetable[i]), layer - 1);
+    }
+  }
+}
+
+void 
+vmprint(pagetable_t pagetable) 
+{
+  printf("page table %p\n", pagetable);
+  vmprint_helpler(pagetable, NPGLAYER);
 }
