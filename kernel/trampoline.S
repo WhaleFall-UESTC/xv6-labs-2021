@@ -27,6 +27,7 @@ uservec:
 	# swap a0 and sscratch
         # so that a0 is TRAPFRAME
         csrrw a0, sscratch, a0
+        # 交换 a0 与 sscratch 的值
 
         # save the user registers in TRAPFRAME
         sd ra, 40(a0)
@@ -63,23 +64,35 @@ uservec:
 	# save the user a0 in p->trapframe->a0
         csrr t0, sscratch
         sd t0, 112(a0)
+        # 将 SSRATCH 的值复制到 t0 中，再将 t0 存 p->trapframe->a0
+        # trapframe 的 a0 存的便是原来的 a0
 
         # restore kernel stack pointer from p->trapframe->kernel_sp
         ld sp, 8(a0)
+        # trapframe 的 kernel_sp 复制到当前 sp，切到内核栈
 
         # make tp hold the current hartid, from p->trapframe->kernel_hartid
         ld tp, 32(a0)
 
         # load the address of usertrap(), p->trapframe->kernel_trap
         ld t0, 16(a0)
+        # 后面会跳转到 t0 的地址，即 usertrap() 函数
 
         # restore kernel page table from p->trapframe->kernel_satp
         ld t1, 0(a0)
         csrw satp, t1
         sfence.vma zero, zero
+        # 将 trapframe 的内核页表地址复制到 t1
+        # 将 stap 设置为 t1，及从用户页表切换成了内核页表
+        # 地址转换是由硬件完成的，为了保证 trampoline.S 的代码还能
+        # 顺利执行，内核页表与用户页表需保证对这段代码有相同的映射（xv6 中都映射到了虚拟地址最高处）
 
         # a0 is no longer valid, since the kernel page
         # table does not specially map p->tf.
+        # 在用户页表中 trapframe 被映射到 trampoline 下方
+        # 但内核页表中没这个规定
+        # 也就是说，a0 中所存的用户空间的 trapframe 地址
+        # 在切换成内核页表后就没用了
 
         # jump to usertrap(), which does not return
         jr t0

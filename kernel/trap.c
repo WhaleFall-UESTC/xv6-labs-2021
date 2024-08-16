@@ -38,17 +38,25 @@ usertrap(void)
 {
   int which_dev = 0;
 
+  // r_sstatus 返回 sstatus 的值，见 riscv.h
   if((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
 
   // send interrupts and exceptions to kerneltrap(),
   // since we're now in the kernel.
   w_stvec((uint64)kernelvec);
-
+  // 后续系统调用之类的操作也会触发异常
+  // 所以要更改异常处理函数
+ 
   struct proc *p = myproc();
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
+  // ecall 指令做了 3 件事:
+  // 1. user mode -> supervisor mode
+  // 2. 将 ecall 指令所处地址保存到 sepc
+  // 3. 跳转到 stvec 所指位置，及 uservec
+  // 所以，这里是将当前进程的 trapframe 的 epc 设置为返回地址 
   
   if(r_scause() == 8){
     // system call
@@ -65,6 +73,7 @@ usertrap(void)
     intr_on();
 
     syscall();
+    // syscall() 的返回值会存储在 trapframe 的 a0 中
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
