@@ -105,4 +105,13 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  int sigticks;
+  volatile int sigcnt;
+  uint64 sigfn;
+  int sig_handler_active;
+  SAVED_REGs_DECLARE;
 };
+
+#define saved2trapframe(REG) p->trapframe->REG = p->saved_##REG;
+#define trapframe2saved(REG) p->saved_##REG = p->trapframe->REG;

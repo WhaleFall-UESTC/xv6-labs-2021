@@ -373,3 +373,12 @@ r_fp()
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t; // 512 PTEs
+
+#define REGs(i) i(epc) i(ra) i(sp) i(gp) i(tp)  \
+i(t0) i(t1) i(t2) i(s0) i(s1) i(s2) i(s3) i(s4) \
+i(s5) i(s6) i(s7) i(s8) i(s9) i(s10) i(s11)     \
+i(a0) i(a1) i(a2) i(a3) i(a4) i(a5) i(a6) i(a7) \
+i(t3) i(t4) i(t5) i(t6)
+
+#define SAVED_REG_DECLARE(REG) uint64 saved_##REG;
+#define SAVED_REGs_DECLARE REGs(SAVED_REG_DECLARE)
