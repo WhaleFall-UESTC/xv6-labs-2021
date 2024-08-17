@@ -10,6 +10,7 @@ struct spinlock tickslock;
 uint ticks;
 
 extern char trampoline[], uservec[], userret[];
+extern pte_t *walk(pagetable_t pagetable, uint64 va, int alloc);
 
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
@@ -50,7 +51,8 @@ usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
-  if(r_scause() == 8){
+  uint64 scause = r_scause();
+  if(scause == 8){
     // system call
 
     if(p->killed)
@@ -67,7 +69,65 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if (scause == STORE_PGFAULT) {
+    uint64 stval = r_stval();
+    uint64 va = PGROUNDDOWN(stval);
+    if (va > MAXVA) {
+      printf("va out of bound\n");
+      exit(-1);
+    }
+    pte_t *pte;
+    if ((pte = walk(p->pagetable, va, 0)) == 0) {
+      printf("Failed to find stval page\n");
+      exit(-1);
+    }
+    if ((*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 || (*pte & PTE_COW) == 0) {
+      printf("illegal pte: %p\n", *pte);
+      printf("V: %d\tU: %d\tCOW: %d\n", *pte & 1, (*pte >> 4) & 1, (*pte >> 9) & 1);
+      goto err;
+    }
+    if (((*pte) & PTE_COW)) {
+      // kalloc a page;
+      char *mem = kalloc();
+      if (mem == 0) {
+        printf("Failed to kalloc a page\n");
+        p->killed = 1;
+        exit(-1);
+      }
+      memset(mem, 0, PGSIZE);
+      // copy the page
+      uint64 pa = PTE2PA(*pte);
+      memmove(mem, (void *) pa, PGSIZE);
+      // "install" new page
+      int perm = PTE_FLAGS(*pte);
+      perm |= PTE_W;
+      perm &= ~PTE_COW;
+      *pte = (PA2PTE(mem) | perm);
+      kfree((void *) pa);
+    }
+
+    // // alloc a new p page
+    // char *mem;
+    // if ((mem = kalloc()) == 0) {
+    //   panic("Failed kalloc a free page");
+    //   exit(-1);
+    // }
+    // uint64 pa = walkaddr(p->pagetable, va);
+    // if (!pa) goto end;
+    // memmove(mem, (char *) pa, PGSIZE);
+    // memset(mem, 0, PGSIZE);
+    // // unbind previous p page
+    // // uvmunmap(p->pagetable, va, 1, 0);
+    // // map new p page
+    // int perm = ((PTE_FLAGS(*pte)) | PTE_W) & (~PTE_COW);
+    // if (mappages(p->pagetable, va, PGSIZE, (uint64) mem, perm) != 0) {
+    //   kfree(mem);
+    //   panic("Failed to map new page");
+    //   exit(-1);
+    // }
+    // kfree((void *) pa);
   } else {
+    err:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
