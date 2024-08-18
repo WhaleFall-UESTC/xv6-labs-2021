@@ -362,26 +362,23 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
       return -1;
 
     pte_t *pte = walk(pagetable, va0, 0);
-    char *mem = kalloc();
-    if (mem == 0) {
-      panic("out of memory");
+    if (pte == 0 || ((*pte) & PTE_V) == 0 || ((*pte) & PTE_U) == 0) {
+      printf("pte is illegal\n");
       exit(-1);
     }
-    memset(mem, 0, PGSIZE);
-    memmove(mem, (void *) pa0, PGSIZE);
-    int perm = PTE_FLAGS(*pte);
-    perm |= PTE_W;
-    perm &= ~PTE_COW;
-
-    if (pte && (*pte | PTE_V) && (*pte | PTE_U) && (*pte | PTE_COW)) {
-      kfree((void *) pa0);
-      *pte = (PA2PTE(mem) | perm);
-    } else {
-      uvmunmap(pagetable, va0, 1, 1);
-      if (mappages(pagetable, va0, PGSIZE, (uint64) mem, perm | PTE_WXRU) == 0) {
-        printf("Failed to map");
+    if ((*pte) & PTE_COW) {
+      char *mem = kalloc();
+      if (mem == 0) {
+        panic("out of memory");
         exit(-1);
       }
+      memset(mem, 0, PGSIZE);
+      memmove(mem, (void *) pa0, PGSIZE);
+      int perm = PTE_FLAGS(*pte);
+      perm |= PTE_W;
+      perm &= ~PTE_COW;
+      *pte = (PA2PTE(mem) | perm);
+      kfree((void *) pa0);
       pa0 = (uint64) mem;
     }
 
