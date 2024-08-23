@@ -1,0 +1,5 @@
+出现key missing，不是因为没有插入，而是因为插入的值被覆盖了
+thread 0，检测到没有key1，调用insert准备插入
+切换到thread1，检测到没有key2，调用insert准备插入，传入的p, n与上一个线程一样
+然后切回thread0，准备好key1的entry，写入完成
+切换到thread1，由于p的地址不变，这时key2覆盖了key1，造成missing
