@@ -1,6 +1,7 @@
 #include "kernel/types.h"
 #include "kernel/stat.h"
 #include "user/user.h"
+#include "user/regs.h"
 
 /* Possible states of a thread: */
 #define FREE        0x0
@@ -8,16 +9,21 @@
 #define RUNNABLE    0x2
 
 #define STACK_SIZE  8192
+#define STACK_TOP(STACK) (((uint64) STACK) + STACK_SIZE)
 #define MAX_THREAD  4
 
+#define state(REG) uint64 REG; 
 
 struct thread {
+  callee_saved_regs(state);
   char       stack[STACK_SIZE]; /* the thread's stack */
   int        state;             /* FREE, RUNNING, RUNNABLE */
 };
 struct thread all_thread[MAX_THREAD];
 struct thread *current_thread;
 extern void thread_switch(uint64, uint64);
+extern void thread_run(uint64, uint64);
+extern void thread_save(uint64);
               
 void 
 thread_init(void)
@@ -62,6 +68,7 @@ thread_schedule(void)
      * Invoke thread_switch to switch from t to next_thread:
      * thread_switch(??, ??);
      */
+    thread_switch((uint64) t, (uint64) current_thread);
   } else
     next_thread = 0;
 }
@@ -76,6 +83,8 @@ thread_create(void (*func)())
   }
   t->state = RUNNABLE;
   // YOUR CODE HERE
+  t->ra = (uint64) func;
+  t->sp = STACK_TOP(t->stack);
 }
 
 void 
