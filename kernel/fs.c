@@ -365,6 +365,21 @@ iunlockput(struct inode *ip)
   iput(ip);
 }
 
+// Read the bn-th uint in the indirect block
+// addr is the block number in disk
+static inline uint 
+readbufbn(uint dev, uint addr, uint bn) 
+{
+  struct buf *bp = bread(dev, addr);
+  uint *a = (uint*)bp->data;
+  if((addr = a[bn]) == 0){
+    a[bn] = addr = balloc(dev);
+    log_write(bp);
+  }
+  brelse(bp);
+  return addr;
+}
+
 // Inode content
 //
 // The content (data) associated with each inode is stored
@@ -374,12 +389,14 @@ iunlockput(struct inode *ip)
 
 // Return the disk block address of the nth block in inode ip.
 // If there is no such block, bmap allocates one.
+// 将文件中的逻辑块号转为实际磁盘块号
 static uint
 bmap(struct inode *ip, uint bn)
 {
-  uint addr, *a;
-  struct buf *bp;
+  // lab 修改后的 inode blocks 构成是 11 + 256 + 256 * 256
+  uint addr;
 
+  // 如果 bn 所指是 Direct Block，直接返回地址
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr = balloc(ip->dev);
@@ -387,18 +404,23 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
+  // 单次映射
   if(bn < NINDIRECT){
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
-    bp = bread(ip->dev, addr);
-    a = (uint*)bp->data;
-    if((addr = a[bn]) == 0){
-      a[bn] = addr = balloc(ip->dev);
-      log_write(bp);
-    }
-    brelse(bp);
-    return addr;
+    return readbufbn(ip->dev, addr, bn);
+  }
+  bn -= NINDIRECT;
+
+  // 双次映射
+  if (bn < NINDIRECT * NINDIRECT) {
+    if((addr = ip->addrs[NDIRECT+1]) == 0)
+      ip->addrs[NDIRECT+1] = addr = balloc(ip->dev);
+    int bn1 = bn / NINDIRECT;
+    int bn2 = bn - bn1 * NINDIRECT;
+    addr = readbufbn(ip->dev, addr, bn1);
+    return readbufbn(ip->dev, addr, bn2);
   }
 
   panic("bmap: out of range");
