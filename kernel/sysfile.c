@@ -16,6 +16,9 @@
 #include "file.h"
 #include "fcntl.h"
 
+static struct inode*
+create(char *path, short type, short major, short minor);
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -165,6 +168,34 @@ bad:
   return -1;
 }
 
+uint64
+sys_symlink(void)
+{
+  char target[MAXPATH], path[MAXPATH];
+  struct inode *ip;
+  int n = 0;
+  if ((n = argstr(0, target, MAXPATH)) < 0 ||
+      argstr(1, path, MAXPATH) < 0) {
+        return -1;
+  }
+
+  begin_op();
+  if ((ip = create(path, T_SYMLINK, 0, 0)) == 0) {
+    end_op();
+    return -1;
+  }
+
+  if (writei(ip, 0, (uint64)target, 0, n) != n) {
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  
+  iunlockput(ip);
+  end_op();
+  return 0;
+}
+
 // Is the directory dp empty except for "." and ".." ?
 static int
 isdirempty(struct inode *dp)
@@ -283,6 +314,40 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+#define CHECK(exp, warn, ...)                           \
+  if (exp) {                                            \
+    printf("follow link: " warn "\n", ## __VA_ARGS__);  \
+    return 0;                                           \
+  }
+
+struct inode*
+follow_symlink_helper(struct inode *ip, char *buf, int n)
+{
+  CHECK(ip->type != T_SYMLINK, "not a symlink")
+  CHECK(n == 0, "symlink too long")
+  // ip在 open 就锁上了
+  char *target = buf;
+  if (readi(ip, 0, (uint64)target, 0, MAXPATH) <= 0) {
+    iunlockput(ip);
+    printf("follow symlink: cannot read %s\n", target);
+    return 0;
+  }
+  iunlockput(ip);
+  CHECK((ip = namei(target)) == 0, "path %s not exist", target);
+  ilock(ip);
+  if (ip->type == T_SYMLINK)
+    return follow_symlink_helper(ip, buf, n - 1);
+  else
+    return ip;
+};
+
+struct inode* 
+follow_symlink(struct inode *ip)
+{
+  char target[MAXPATH];
+  return follow_symlink_helper(ip, target, MAXSYMLINK);
+}
+
 uint64
 sys_open(void)
 {
@@ -320,6 +385,13 @@ sys_open(void)
     iunlockput(ip);
     end_op();
     return -1;
+  }
+
+  if (ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)) {
+    if ((ip = follow_symlink(ip)) == 0) {
+      end_op();
+      return -1;
+    }
   }
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
