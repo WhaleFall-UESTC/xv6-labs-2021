@@ -454,6 +454,25 @@ itrunc(struct inode *ip)
     ip->addrs[NDIRECT] = 0;
   }
 
+  if (ip->addrs[NDIRECT+1]) {
+    bp = bread(ip->dev, ip->addrs[NDIRECT]);
+    a = (uint*)bp->data;
+    for (j = 0; j < NINDIRECT; j++) {
+      if (a[j]) {
+        struct buf *bp1 = bread(ip->dev, a[j]);
+        uint *a1 = (uint*)bp1->data;
+        for (int k = 0; k < NINDIRECT; k++) {
+          if (a1[k])
+            bfree(ip->dev, a1[k]);
+        }
+        brelse(bp1);
+        bfree(ip->dev, a[j]);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT+1]);
+  }
+
   ip->size = 0;
   iupdate(ip);
 }
