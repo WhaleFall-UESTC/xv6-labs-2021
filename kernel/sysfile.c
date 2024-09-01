@@ -484,3 +484,32 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_mmap(void)
+{
+  uint64 addr;
+  int len, port, flags, fd, offset;
+  struct file *f;
+
+  if (argaddr(0, &addr) < 0 || argint(1, &len) < 0 ||
+      argint(2, &port < 0)  || argint(3, &flags) < 0 ||
+      argfd(4, &fd, &f) < 0 || argint(5, &offset) < 0)
+    return -1;
+
+  
+  return 0;
+}
+
+uint64
+sys_munmap(void)
+{
+  uint64 addr;
+  int len;
+
+  if (argaddr(0, &addr) < 0 || argint(1, &len) < 0)
+    return -1;
+
+
+  return 0;
+}
