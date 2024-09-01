@@ -565,7 +565,7 @@ find_unmap_va(pagetable_t pgtbl, int len)
 
 struct vma* get_vma(struct proc* p) {
   short bitsmap = p->vmasmap;
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < NVMA; i++) {
     if ((bitsmap & 1) == 0) {
       p->vmasmap |= (1 << i);
       p->vmas[i].on = i;
@@ -577,35 +577,51 @@ struct vma* get_vma(struct proc* p) {
   return 0;
 }
 
+static inline int 
+prot2perm(int prot) {
+  int ret = 0;
+  ret |= (prot | PROT_READ) ? PTE_R : 0;
+  ret |= (prot | PROT_WRITE) ? PTE_W : 0;
+  ret |= (prot | PROT_EXEC) ? PTE_X : 0;
+  return ret;
+}
+
 uint64
 sys_mmap(void)
 {
   uint64 addr = 0;
-  int len = 0, port = 0, flags = 0, offset = 0;
+  int len = 0, prot = 0, flags = 0, offset = 0;
   struct file *f;
 
   if (argaddr(0, &addr) < 0 || argint(1, &len) < 0 ||
-      argint(2, &port) < 0  || argint(3, &flags) < 0 ||
+      argint(2, &prot) < 0  || argint(3, &flags) < 0 ||
       argfd(4, 0, &f) < 0 || argint(5, &offset) < 0)
     return -1;
 
   struct proc *p = myproc();
   len = PGROUNDUP(len);
+  if ((!f->readable && (prot & PROT_READ))
+   || (!f->writable && (prot & PROT_WRITE)))
+    return -1;
   // Get free va and set them valid
+  addr = (addr == 0 ? find_unmap_va(p->pagetable, len) : addr);
   if (addr == 0)
-    addr = find_unmap_va(p->pagetable, len);
+    return -1;
   // mmap va to the same pa without perm
-  mappages(p->pagetable, addr, len, addr, 0);
+  if (mappages(p->pagetable, addr, len, addr, 0) < 0)
+    return -1;
   // Get and write to a vma
   struct vma* v = get_vma(p);
+  if (v == 0)
+    return -1;
   v->addr = addr;
   v->len = len;
-  v->port = port;
+  v->perm = prot2perm(prot);
   v->flags = flags;
   v->file = f;
   v->offset = offset;
   filedup(f);
-  return 0;
+  return addr;
 }
 
 uint64
