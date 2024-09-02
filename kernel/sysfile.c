@@ -539,23 +539,27 @@ find_unmap_va(pagetable_t pgtbl, int len)
   int cnt = 0, npage = len >> 12;
   int si = START(2), sj = START(1), sk = START(0);
   for (int i = si; i >= 0; i--) {
-    pte_t *pte = &pgtbl[i];
-    pagetable_t pgtbl1 = get_pgtbl_alloc(pte);
+    // pte_t *pte = &pgtbl[i];
+    // pagetable_t pgtbl1 = get_pgtbl_alloc(pte);
     for (int j = (i == si) ? sj : 511; j >= 0; j--) {
-      pte_t *pte1 = &pgtbl1[j];
-      pagetable_t pgtbl0 = get_pgtbl_alloc(pte1);
+      // pte_t *pte1 = &pgtbl1[j];
+      // pagetable_t pgtbl0 = get_pgtbl_alloc(pte1);
       for (int k = (i == si && j == sj) ? sk : 511; k >= 0; k--) {
-        pte_t *pte0 = &pgtbl0[k];
+        // pte_t *pte0 = &pgtbl0[k];
+        uint64 va = BUILDVA(i, j, k, 0);
+        pte_t *pte0 = walk(pgtbl, va, 1);
         if (*pte0 & PTE_V) {
           cnt = 0;
         } else {
           cnt++;
           if (cnt == npage) {
+            // printf("reach npage: %d, cur_pte: %x at %p\n", npage, *pte0, pte);
+            // pte_t *ptew = walk(pgtbl, BUILDVA(i, j, k, 0), 1);
+            // printf("and get pte by walk(): %x at %p\n", *ptew, ptew);
             // if plus npage, mem cannot reused
             // start += npage;
-            uint64 ret = BUILDVA(i, j, k, 0);
             // set_npage_valid(pgtbl, npage, i, j, k);
-            return ret;
+            return va;
           }
         }
       }
@@ -614,11 +618,13 @@ sys_mmap(void)
     printf("mmap: failed to find free va\n");
     return -1;
   }
-  // mmap va to the same pa without perm
+  // mmap va to the same pa with perm PTE_U
+  printf("mappages addr: %p len: %x\n", addr, len);
   if (mappages(p->pagetable, addr, len, addr, PTE_U) < 0) {
     printf("mmap: failed to map\n");
     return -1;
   }
+  printf("now pte of va %p: %p\n", addr, *walk(p->pagetable, addr, 0));
   // Get and write to a vma
   struct vma* v = get_vma(p);
   if (v == 0) {
@@ -702,17 +708,17 @@ sys_munmap(void)
       }
       iunlock(v->file->ip);
       end_op();
+    }
+    if (PTE2PA(*pte) != va) {
       kfree((void*)PTE2PA(*pte));
     }
-    if (PTE2PA(*pte)!= va) {
-      kfree((void*)PTE2PA(*pte));
-    }
+    *pte = 0;
   }
 
-  printf("munmap: nvmunmap\n");
-  // if not alloc, va map to the same pa, in unused space
-  uvmunmap(p->pagetable, addr, len >> 12, 0);
-  printf("munmap: nvmunmap end\n");
+  // printf("munmap: nvmunmap\n");
+  // // if not alloc, va map to the same pa, in unused space
+  // uvmunmap(p->pagetable, addr, len >> 12, 0);
+  // printf("munmap: nvmunmap end\n");
 
   if (addr == v->addr && len == v->len) {
     fileclose(v->file);
