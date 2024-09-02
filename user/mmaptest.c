@@ -39,15 +39,11 @@ _v1(char *p)
   int i;
   for (i = 0; i < PGSIZE*2; i++) {
     if (i < PGSIZE + (PGSIZE/2)) {
-      if (p[i] != 'A') {
-        printf("mismatch at %d, wanted 'A', got 0x%x\n", i, p[i]);
+      if (p[i] != 'A') 
         err("v1 mismatch (1)");
-      }
     } else {
-      if (p[i] != 0) {
-        printf("mismatch at %d, wanted zero, got 0x%x\n", i, p[i]);
+      if (p[i] != 0)
         err("v1 mismatch (2)");
-      }
     }
   }
 }
@@ -197,10 +193,8 @@ mmap_test(void)
   printf("test not-mapped unmap\n");
   
   // unmap the rest of the mapped memory.
-  if (munmap(p+PGSIZE*2, PGSIZE) == -1) {
-    printf("munmap ret\n");
+  if (munmap(p+PGSIZE*2, PGSIZE) == -1) 
     err("munmap (4)");
-  }
 
   printf("test not-mapped unmap: OK\n");
     
@@ -272,8 +266,6 @@ fork_test(void)
   if (p2 == MAP_FAILED)
     err("mmap (5)");
 
-  printf("Got p1: %p\nGot p2: %p\n", p1, p2);
-
   // read just 2nd page.
   if(*(p1+PGSIZE) != 'A')
     err("fork mismatch (1)");
@@ -281,9 +273,7 @@ fork_test(void)
   if((pid = fork()) < 0)
     err("fork");
   if (pid == 0) {
-    printf("check child v1\n");
     _v1(p1);
-    printf("child v1 OK\n");
     munmap(p1, PGSIZE); // just the first page
     exit(0); // tell the parent that the mapping looks OK.
   }
@@ -297,11 +287,8 @@ fork_test(void)
   }
 
   // check that the parent's mappings are still there.
-  printf("check parent p1\n");
   _v1(p1);
-  printf("parent p1 OK. check parent p2\n");
   _v1(p2);
-  printf("parent p1 OK\n");
 
   printf("fork_test OK\n");
 }

@@ -510,6 +510,7 @@ find_vma(struct proc* p, uint64 addr)
       return &p->vmas[i];
     bitsmap >>= 1;
   }
+
   printf("find_vma: failed to find addr: %p\n", addr);
   printf("pid=%d, bitsmap:%x,print vmas int this proc:\n", p->pid, p->vmasmap);
   for (struct vma *v = p->vmas; v < p->vmas + NVMA; v++) {
@@ -525,7 +526,6 @@ mmap(uint64 addr, int len, int prot, int flags, struct file *f, int offset)
   len = PGROUNDUP(len);
   if ((!f->readable && (prot & PROT_READ))
    || (!f->writable && (prot & PROT_WRITE) && !(flags & MAP_PRIVATE))) {
-    printf("mmap: file R/W err\n");
     return -1;
    }
   // Get free va and set them valid
@@ -592,14 +592,12 @@ munmap(uint64 addr, int len)
       return -1;
     }
     if (write_back && (*pte & PTE_D)) {
-      printf("munmap: try to write va: %p back\n", va);
       uint off = va - v->addr + v->offset;
       begin_op();
       ilock(v->file->ip);
       // do not need to only write back dirty page
       int nwrite = writei(v->file->ip, 1, va, off, PGSIZE);
       if (nwrite != PGSIZE) {
-        printf("munmap: write back failed. va: %p, len: %x, nwrite: %x, off: %x\n", va, PGSIZE, nwrite, off);
         return -1;
       }
       iunlock(v->file->ip);

@@ -46,15 +46,10 @@ mmap_trap_handler(struct proc *p, struct vma *v, uint64 stval)
     return -1;
   }
   *pte = PA2PTE(pa) | v->perm | PTE_V | PTE_U;
-  printf("mmap trap, stval:%p, va:%p map to pa:%p\n", stval, va, pa);
-  printf("new pte: %x\n", *pte);
   uint64 offset = v->offset + stval - v->addr;
   ilock(v->file->ip);
-  // printf("get ilock, read file\n");
   readi(v->file->ip, 0, pa, offset, PGSIZE);
   iunlock(v->file->ip);
-  printf("write to pa with off: 0x%x, got value at pa: 0x%x\n", offset, *((uint64 *)pa));
-  printf("finish mmap trap\n");
   return 0;
 }
 
