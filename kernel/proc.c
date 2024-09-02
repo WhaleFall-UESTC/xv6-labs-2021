@@ -353,6 +353,15 @@ exit(int status)
     }
   }
 
+  // munmap all vma
+  short bitsmap = p->vmasmap;
+  for (int i = 0; i < NVMA; i++) {
+    if (bitsmap & 1) {
+      
+    }
+    bitsmap >>= 1;
+  }
+
   begin_op();
   iput(p->cwd);
   end_op();

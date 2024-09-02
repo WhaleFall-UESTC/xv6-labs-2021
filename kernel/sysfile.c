@@ -485,112 +485,6 @@ sys_pipe(void)
   return 0;
 }
 
-static inline pagetable_t 
-get_pgtbl_alloc(pte_t *pte) 
-{
-  pagetable_t pgtbl;
-  if (*pte & PTE_V) {
-    pgtbl = (pagetable_t)PTE2PA(*pte);
-  } else {
-    if ((pgtbl = kalloc()) == 0)
-      return 0;
-    memset(pgtbl, 0, PGSIZE);
-    *pte = PA2PTE(pgtbl) | PTE_V;
-  }
-  return pgtbl;
-}
-
-// static inline void
-// set_npage_valid(pagetable_t pgtbl, int npage, int i, int j, int k)
-// {
-//   while (npage--) {
-//     if (--i == 0) {
-//       i = 511;
-//       if (--j == 0) {
-//         j = 511;
-//         if (--i == 0) {
-//           printf("set_npage_valid: exhaust\n");
-//           return;
-//         }
-//       }
-//     }
-//     pte_t *pte;
-//     printf("walk %x %x %x %p\n", i, j, k, BUILDVA(i, j, k, 0));
-//     pte = walk(pgtbl, BUILDVA(i, j, k, 0), 0);
-//     printf("get pte %p at %p\n", *pte, pte);
-//     pte == 0 wrong
-//     *pte |= PTE_V;
-//   }
-// }
-
-static int start = 2;
-#define START(NUM) (511 - ((start >> (9 * NUM)) & 0x1ff))
-
-// len must be a multiple of PGSIZE
-// this function will set found pages valid
-// len should not greater than 512 PGSIZE
-uint64
-find_unmap_va(pagetable_t pgtbl, int len)
-{
-  if ((len & 0xfff) != 0 ) {
-    printf("find_unmap_va: len %x illegal\n", len);
-    return 0;
-  }
-  int cnt = 0, npage = len >> 12;
-  int si = START(2), sj = START(1), sk = START(0);
-  for (int i = si; i >= 0; i--) {
-    // pte_t *pte = &pgtbl[i];
-    // pagetable_t pgtbl1 = get_pgtbl_alloc(pte);
-    for (int j = (i == si) ? sj : 511; j >= 0; j--) {
-      // pte_t *pte1 = &pgtbl1[j];
-      // pagetable_t pgtbl0 = get_pgtbl_alloc(pte1);
-      for (int k = (i == si && j == sj) ? sk : 511; k >= 0; k--) {
-        // pte_t *pte0 = &pgtbl0[k];
-        uint64 va = BUILDVA(i, j, k, 0);
-        pte_t *pte0 = walk(pgtbl, va, 1);
-        if (*pte0 & PTE_V) {
-          cnt = 0;
-        } else {
-          cnt++;
-          if (cnt == npage) {
-            // printf("reach npage: %d, cur_pte: %x at %p\n", npage, *pte0, pte);
-            // pte_t *ptew = walk(pgtbl, BUILDVA(i, j, k, 0), 1);
-            // printf("and get pte by walk(): %x at %p\n", *ptew, ptew);
-            // if plus npage, mem cannot reused
-            // start += npage;
-            // set_npage_valid(pgtbl, npage, i, j, k);
-            return va;
-          }
-        }
-      }
-    }
-  }
-  return 0;
-}
-
-struct vma* get_vma(struct proc* p) {
-  short bitsmap = p->vmasmap;
-  for (int i = 0; i < NVMA; i++) {
-    if ((bitsmap & 1) == 0) {
-      p->vmasmap |= (1 << i);
-      p->vmas[i].no = i;
-      return &p->vmas[i];
-    }
-    bitsmap >>= 1;
-  }
-  printf("no free vma\n");
-  return 0;
-}
-
-static inline int 
-prot2perm(int prot) {
-  int ret = 0;
-  ret |= (prot | PROT_READ) ? PTE_R : 0;
-  ret |= (prot | PROT_WRITE) ? PTE_W : 0;
-  ret |= (prot | PROT_EXEC) ? PTE_X : 0;
-  return ret;
-}
-
 uint64
 sys_mmap(void)
 {
@@ -604,134 +498,19 @@ sys_mmap(void)
     printf("mmap: arg illegal\n");
     return -1;
   }
-
-  struct proc *p = myproc();
-  len = PGROUNDUP(len);
-  if ((!f->readable && (prot & PROT_READ))
-   || (!f->writable && (prot & PROT_WRITE) && !(flags & MAP_PRIVATE))) {
-    printf("mmap: file R/W err\n");
-    return -1;
-   }
-  // Get free va and set them valid
-  addr = (addr == 0 ? find_unmap_va(p->pagetable, len) : addr);
-  if (addr == 0) {
-    printf("mmap: failed to find free va\n");
-    return -1;
-  }
-  // mmap va to the same pa with perm PTE_U
-  printf("mappages addr: %p len: %x\n", addr, len);
-  if (mappages(p->pagetable, addr, len, addr, PTE_U) < 0) {
-    printf("mmap: failed to map\n");
-    return -1;
-  }
-  printf("now pte of va %p: %p\n", addr, *walk(p->pagetable, addr, 0));
-  // Get and write to a vma
-  struct vma* v = get_vma(p);
-  if (v == 0) {
-    printf("mmap: failed to get a free vma\n");
-    return -1;
-  }
-  v->addr = addr;
-  v->len = len;
-  v->perm = prot2perm(prot);
-  v->flags = flags;
-  v->file = f;
-  v->offset = offset;
-  filedup(f);
-  return addr;
-}
-
-inline struct vma* 
-find_vma(struct proc* p, uint64 addr)
-{
-  short bitsmap = p->vmasmap;
-  for (int i = 0; i < NVMA; i++)
-    if ((bitsmap & 1) && INRANGE(addr, p->vmas[i]))
-      return &p->vmas[i];
-  return 0;
+  return mmap(addr, len, prot, flags, f, offset);
 }
 
 uint64
 sys_munmap(void)
 {
-  printf("call munmap\n");
   uint64 addr;
   int len;
-  struct vma *v;
 
   // munmap space should be on top or bottom of vma
   if (argaddr(0, &addr) < 0 || argint(1, &len) < 0) {
     printf("munmap: arg illegal\n");
     return -1;
   }
-
-  printf("munmap: find vma and check\n");
-  struct proc *p = myproc();
-  if ((v = find_vma(p, addr)) == 0) {
-    printf("munmap: failed find vma\n");
-    return -1;
-  }
-
-  if (((addr & 0x1ff) != 0) || ((len & 0xfff) != 0)) {
-    printf("munmap: addr or len is not page aligned. addr: %p, len: %x\n", addr, len);
-    return -1;
-  }
-
-  if (!(addr == v->addr || addr + len == v->addr + v->len)) {
-    printf("munmap: punch a hole in the middle! addr: %p, len: %x, v->addr: %p v->len: %x\n", addr, len, v->addr, v->len);
-    return -1;
-  }
-
-  if (addr < v->addr || addr + len > v->addr + v->len) {
-    printf("munmap: bigger than vma range. addr: %p, len: %x, v->addr: %p v->len: %x\n", addr, len, v->addr, v->len);
-    return -1;
-  }
-
-  // int alloced = (walkaddr(p->pagetable, addr) != addr);
-  int write_back = ((v->flags & MAP_SHARED) && !(v->flags & MAP_PRIVATE));
-  for (uint64 va = addr; va < addr + len; va += PGSIZE) {
-    pte_t *pte;
-    if((pte = walk(p->pagetable, va, 0)) == 0) {
-      printf("munmap: writing. can not find pte from va: %p\n", va);
-      return -1;
-    }
-    if (write_back && (*pte & PTE_D)) {
-      printf("munmap: try to write va: %p back\n", va);
-      uint off = va - v->addr + v->offset;
-      begin_op();
-      ilock(v->file->ip);
-      // do not need to only write back dirty page
-      int nwrite = writei(v->file->ip, 1, va, off, PGSIZE);
-      if (nwrite != PGSIZE) {
-        printf("munmap: write back failed. va: %p, len: %x, nwrite: %x, off: %x\n", va, PGSIZE, nwrite, off);
-        return -1;
-      }
-      iunlock(v->file->ip);
-      end_op();
-    }
-    if (PTE2PA(*pte) != va) {
-      kfree((void*)PTE2PA(*pte));
-    }
-    *pte = 0;
-  }
-
-  // printf("munmap: nvmunmap\n");
-  // // if not alloc, va map to the same pa, in unused space
-  // uvmunmap(p->pagetable, addr, len >> 12, 0);
-  // printf("munmap: nvmunmap end\n");
-
-  if (addr == v->addr && len == v->len) {
-    fileclose(v->file);
-    p->vmasmap &= ~(1 << v->no);
-    memset(v, 0, sizeof(struct vma));
-  }
-  else if (addr == v->addr) {
-    v->addr += len;
-    v->len -= len;
-    v->offset += len;
-  } else {
-    v->len -= len;
-  }
-
-  return 0;
+  return mnumap(addr, len);
 }

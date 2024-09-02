@@ -220,20 +220,16 @@ mmap_test(void)
   close(fd1);
   unlink("mmap1");
 
-  printf("finish op mmap1\n");
   int fd2;
   if((fd2 = open("mmap2", O_RDWR|O_CREATE)) < 0)
     err("open mmap2");
   if(write(fd2, "67890", 5) != 5)
     err("write mmap2");
-  printf("p1 map at %p. start mmap p2\n", p1);
   char *p2 = mmap(0, PGSIZE, PROT_READ, MAP_PRIVATE, fd2, 0);
-  printf("mmap p2 over\n");
   if(p2 == MAP_FAILED)
     err("mmap mmap2");
   close(fd2);
   unlink("mmap2");
-  printf("finish op mmap1\n");
 
   if(memcmp(p1, "12345", 5) != 0)
     err("mmap1 mismatch");
