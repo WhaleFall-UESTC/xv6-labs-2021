@@ -621,7 +621,9 @@ either_copyin(void *dst, int user_src, uint64 src, uint64 len)
   if(user_src){
     return copyin(p->pagetable, dst, src, len);
   } else {
+    // printf("Check memmove in either_copyin\n");
     memmove(dst, (char*)src, len);
+    // printf("either_copyin memove: OK\n");
     return 0;
   }
 }

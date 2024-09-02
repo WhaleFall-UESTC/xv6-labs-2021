@@ -112,12 +112,18 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
 
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
+  if(pte == 0) {
+    printf("walkaddr: pte zero not mapped va: %p\n", va);
     return 0;
-  if((*pte & PTE_V) == 0)
+  }
+  if((*pte & PTE_V) == 0) {
+    printf("walkaddr: pte not valid va: %p\n", va);
     return 0;
-  if((*pte & PTE_U) == 0)
+  }
+  if((*pte & PTE_U) == 0) {
+    printf("walkaddr: pte not user va: %p\n", va);
     return 0;
+  }
   pa = PTE2PA(*pte);
   return pa;
 }
@@ -378,12 +384,16 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
+    if(pa0 == 0) {
+      printf("copyin: failed to find pa. va: %p\n", va0);
       return -1;
+    }
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;
+    // printf("Check memmove in copyin\n");
     memmove(dst, (void *)(pa0 + (srcva - va0)), n);
+    // printf("copyin memmove: OK\n");
 
     len -= n;
     dst += n;

@@ -85,7 +85,7 @@ enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 #define NVMA 16
 
 struct vma {
-  ushort on;
+  ushort no;
   uint64 addr;
   uint len;
   int perm;
@@ -93,6 +93,8 @@ struct vma {
   int offset;
   struct file *file;
 };
+
+#define INRANGE(address, vma) (address >= vma.addr && address <= (vma.addr + vma.len))
 
 // Per-process state
 struct proc {

@@ -124,14 +124,16 @@ mmap_test(void)
   // mapping
   p = mmap(0, PGSIZE*2, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
   if (p == MAP_FAILED)
-    err("mmap (2)");
+    err("mmap (2): failed mmap");
+    // err("munmap (2)");
   if (close(fd) == -1)
     err("close");
   _v1(p);
   for (i = 0; i < PGSIZE*2; i++)
     p[i] = 'Z';
   if (munmap(p, PGSIZE*2) == -1)
-    err("munmap (2)");
+    err("munmap (2): not write back");
+    // err("munmap (2)");
 
   printf("test mmap private: OK\n");
     
@@ -195,8 +197,10 @@ mmap_test(void)
   printf("test not-mapped unmap\n");
   
   // unmap the rest of the mapped memory.
-  if (munmap(p+PGSIZE*2, PGSIZE) == -1)
+  if (munmap(p+PGSIZE*2, PGSIZE) == -1) {
+    printf("munmap ret\n");
     err("munmap (4)");
+  }
 
   printf("test not-mapped unmap: OK\n");
     

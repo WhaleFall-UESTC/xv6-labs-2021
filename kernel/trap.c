@@ -108,7 +108,8 @@ usertrap(void)
     uint64 stval = r_stval();
     int index = -1;
     for (int i = 0; i < NVMA; i++) {
-      if (stval >= p->vmas[i].addr && stval <= p->vmas[i].addr + p->vmas[i].len) {
+      // if (stval >= p->vmas[i].addr && stval <= p->vmas[i].addr + p->vmas[i].len) {
+      if (INRANGE(stval, p->vmas[i])) {
         index = i;
         break;
       }
