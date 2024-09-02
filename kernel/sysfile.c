@@ -512,5 +512,5 @@ sys_munmap(void)
     printf("munmap: arg illegal\n");
     return -1;
   }
-  return mnumap(addr, len);
+  return munmap(addr, len);
 }

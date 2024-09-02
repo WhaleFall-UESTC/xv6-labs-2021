@@ -505,9 +505,16 @@ inline struct vma*
 find_vma(struct proc* p, uint64 addr)
 {
   short bitsmap = p->vmasmap;
-  for (int i = 0; i < NVMA; i++)
+  for (int i = 0; i < NVMA; i++) {
     if ((bitsmap & 1) && INRANGE(addr, p->vmas[i]))
       return &p->vmas[i];
+    bitsmap >>= 1;
+  }
+  printf("find_vma: failed to find addr: %p\n", addr);
+  printf("pid=%d, bitsmap:%x,print vmas int this proc:\n", p->pid, p->vmasmap);
+  for (struct vma *v = p->vmas; v < p->vmas + NVMA; v++) {
+    printf("vmas[%d]: add: %p\tlen:%x\tbitsmap:%d\n", v->no, v->addr, v->len, (bitsmap >> v->no) & 1);
+  }
   return 0;
 }
 
@@ -528,12 +535,12 @@ mmap(uint64 addr, int len, int prot, int flags, struct file *f, int offset)
     return -1;
   }
   // mmap va to the same pa with perm PTE_U
-  printf("mappages addr: %p len: %x\n", addr, len);
+  // printf("mappages addr: %p len: %x\n", addr, len);
   if (mappages(p->pagetable, addr, len, addr, PTE_U) < 0) {
     printf("mmap: failed to map\n");
     return -1;
   }
-  printf("now pte of va %p: %p\n", addr, *walk(p->pagetable, addr, 0));
+  // printf("now pte of va %p: %p\n", addr, *walk(p->pagetable, addr, 0));
   // Get and write to a vma
   struct vma* v = get_free_vma(p);
   if (v == 0) {
@@ -551,7 +558,7 @@ mmap(uint64 addr, int len, int prot, int flags, struct file *f, int offset)
 }
 
 int 
-mnumap(uint64 addr, int len)
+munmap(uint64 addr, int len)
 {
   struct vma *v;
   struct proc *p = myproc();

@@ -94,7 +94,7 @@ struct vma {
   struct file *file;
 };
 
-#define INRANGE(address, vma) (address >= vma.addr && address <= (vma.addr + vma.len))
+#define INRANGE(address, vma) ((address >= vma.addr) && address <= (vma.addr + vma.len))
 
 // Per-process state
 struct proc {

@@ -289,6 +289,23 @@ fork(void)
   }
   np->sz = p->sz;
 
+  // Copy vma
+  short bitsmap = np->vmasmap = p->vmasmap;
+  for (int i = 0; i < NVMA; i++) {
+    if (bitsmap & 1) {
+      // memmove(&np->vmas[i], &p->vmas[i], sizeof(struct vma));
+      np->vmas[i] = p->vmas[i];
+      filedup(p->vmas[i].file);
+      for (uint64 va = p->vmas[i].addr; va < p->vmas[i].addr + p->vmas[i].len; va += PGSIZE) {
+        // pte_t *pte_p = walk(p->pagetable, va, 0);
+        pte_t *pte_np = walk(np->pagetable, va, 1);
+        // *pte_np = *pte_p;
+        *pte_np = PA2PTE(va) | PTE_V | PTE_U;
+      }
+    }
+    bitsmap >>= 1;
+  }
+
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
@@ -353,12 +370,11 @@ exit(int status)
     }
   }
 
-  // munmap all vma
+  // close all vma
   short bitsmap = p->vmasmap;
   for (int i = 0; i < NVMA; i++) {
-    if (bitsmap & 1) {
-      
-    }
+    if (bitsmap & 1) 
+      munmap(p->vmas[i].addr, p->vmas[i].len);
     bitsmap >>= 1;
   }
 

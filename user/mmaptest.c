@@ -272,6 +272,8 @@ fork_test(void)
   if (p2 == MAP_FAILED)
     err("mmap (5)");
 
+  printf("Got p1: %p\nGot p2: %p\n", p1, p2);
+
   // read just 2nd page.
   if(*(p1+PGSIZE) != 'A')
     err("fork mismatch (1)");
@@ -279,7 +281,9 @@ fork_test(void)
   if((pid = fork()) < 0)
     err("fork");
   if (pid == 0) {
+    printf("check child v1\n");
     _v1(p1);
+    printf("child v1 OK\n");
     munmap(p1, PGSIZE); // just the first page
     exit(0); // tell the parent that the mapping looks OK.
   }
@@ -293,8 +297,11 @@ fork_test(void)
   }
 
   // check that the parent's mappings are still there.
+  printf("check parent p1\n");
   _v1(p1);
+  printf("parent p1 OK. check parent p2\n");
   _v1(p2);
+  printf("parent p1 OK\n");
 
   printf("fork_test OK\n");
 }
